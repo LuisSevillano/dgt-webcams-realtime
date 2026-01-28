@@ -23,8 +23,7 @@ jobs:
       - name: Upload to FTP
         run: |
           mkdir -p ~/.ssh
-          # Decodifica la llave desde Base64 antes de guardarla
-          echo "${{ secrets.SFTP_PRIVATE_KEY }}" | base64 -d > ~/.ssh/id_rsa
+          echo "${{ secrets.SFTP_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H "${{ secrets.SFTP_HOST }}" >> ~/.ssh/known_hosts
 
