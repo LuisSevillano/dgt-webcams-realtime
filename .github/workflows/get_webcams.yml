@@ -1,4 +1,4 @@
-name: DGT Webcams to FTP
+name: DGT Webcams Automatizada
 
 on:
   schedule:
@@ -6,19 +6,36 @@ on:
   workflow_dispatch:
 
 env:
-  RUTA_REMOTA: "/infografias/2026/01/dgt_webcams_realtime/data"
+  # Ajusta esta ruta a tu carpeta de destino en el FTP
+  RUTA_REMOTA: "/tu/ruta/remota/webcams"
 
 jobs:
-  descargar-y-subir:
-    name: Captura y Transferencia
+  descargar-webcams:
+    name: Capturar imágenes DGT
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Generate Data (Download Webcams)
-        run: bash script.sh
+      - name: Check required secrets
+        run: |
+          if [ -z "${{ secrets.SFTP_HOST }}" ] || [ -z "${{ secrets.SFTP_USERNAME }}" ] || [ -z "${{ secrets.SFTP_PRIVATE_KEY }}" ]; then
+            echo "❌ Faltan secretos SFTP_HOST, SFTP_USERNAME o SFTP_PRIVATE_KEY"
+            exit 1
+          fi
+          echo "✅ Secretos verificados"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openssh-client curl
+          # Creamos la carpeta de imágenes que espera el script
+          mkdir -p images
+
+      - name: Run download script
+        run: |
+          # Ejecutamos tu script de bash
+          bash script.sh
 
       - name: Upload to FTP
         run: |
@@ -27,10 +44,9 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H "${{ secrets.SFTP_HOST }}" >> ~/.ssh/known_hosts
 
+          echo "Subiendo imágenes al FTP..."
           if [ -d "images" ]; then
-            echo "✅ Subiendo imágenes al FTP..."
-            # rsync subirá las carpetas y archivos nuevos creados por el script
-            rsync -avz -e ssh images/ "${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_HOST }}:$RUTA_REMOTA/"
+            scp -r images/* "${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_HOST }}:$RUTA_REMOTA/"
           else
-            echo "⚠️ No hay imágenes para subir."
+            echo "⚠️ No se encontraron imágenes para subir."
           fi
