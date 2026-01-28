@@ -6,50 +6,59 @@ on:
   workflow_dispatch:
 
 env:
-  # Ajusta esta ruta a tu carpeta de destino en el FTP
+  # Histórico con caché (S3 estándar)
   RUTA_REMOTA: "/infografias/2026/01/dgt_webcams_realtime/data"
+  # Últimas imágenes sin caché (Configurada en el CDN/Servidor)
+  RUTA_REMOTA_NO_CACHE: "/infografias/2026/01/dgt_webcams_realtime/latest"
 
 jobs:
-  descargar-webcams:
-    name: Capturar imágenes DGT
+  descargar-y-subir:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Check required secrets
-        run: |
-          if [ -z "${{ secrets.SFTP_HOST }}" ] || [ -z "${{ secrets.SFTP_USERNAME }}" ] || [ -z "${{ secrets.SFTP_PRIVATE_KEY }}" ]; then
-            echo "❌ Faltan secretos SFTP_HOST, SFTP_USERNAME o SFTP_PRIVATE_KEY"
-            exit 1
-          fi
-          echo "✅ Secretos verificados"
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y openssh-client curl
-          # Creamos la carpeta de imágenes que espera el script
+          sudo apt-get install -y openssh-client rsync
           mkdir -p images
 
       - name: Run download script
-        run: |
-          # Ejecutamos tu script de bash
-          bash script.sh
+        run: bash script.sh
 
-      - name: Upload to FTP
+      - name: Prepare Latest and Upload
         run: |
+          # 1. Configurar SSH
           mkdir -p ~/.ssh
           echo "${{ secrets.SFTP_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H "${{ secrets.SFTP_HOST }}" >> ~/.ssh/known_hosts
 
-          echo "Subiendo imágenes al FTP..."
           if [ -d "images" ]; then
-            # Usamos printf para enviar los comandos de forma limpia
-            # 'put -r' sube la estructura de carpetas
-            printf "cd $RUTA_REMOTA\nput -r images/*\nbye\n" | sftp -oBatchMode=yes -b - "${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_HOST }}"
-            echo "✅ Subida finalizada."
+            echo "Generando archivos _latest.jpg por cada cámara..."
+            
+            # Buscamos directorios que contengan archivos .jpg
+            find images -type d | while read dir; do
+              # Tomamos el .jpg más reciente de cada subcarpeta
+              LATEST_IN_DIR=$(ls -t "$dir"/*.jpg 2>/dev/null | head -1)
+              if [ -n "$LATEST_IN_DIR" ]; then
+                cp "$LATEST_IN_DIR" "$dir/_latest.jpg"
+              fi
+            done
+
+            # 2. SUBIDA 1: Histórico completo (incluye los _latest.jpg dentro de cada carpeta)
+            echo "🚀 Subiendo histórico a $RUTA_REMOTA..."
+            rsync -avz --size-only --inplace -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
+              images/ "${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_HOST }}:$RUTA_REMOTA/"
+
+            # 3. SUBIDA 2: Solo los _latest.jpg a la carpeta sin caché
+            # Usamos filtros para no resubir todo el histórico a la carpeta 'latest'
+            echo "🚀 Subiendo solo _latest.jpg a $RUTA_REMOTA_NO_CACHE..."
+            rsync -avz --include='*/' --include='_latest.jpg' --exclude='*' --size-only --inplace \
+              -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
+              images/ "${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_HOST }}:$RUTA_REMOTA_NO_CACHE/"
+            
+            echo "✅ Todo actualizado correctamente."
           else
-            echo "⚠️ No se encontraron imágenes para subir."
+            echo "⚠️ No se encontraron imágenes."
           fi
