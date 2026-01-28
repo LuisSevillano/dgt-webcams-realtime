@@ -23,14 +23,27 @@ jobs:
       - name: Upload to FTP
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SFTP_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          # Decodificamos (asumiendo que la pegaste en Base64 como hablamos)
+          echo "${{ secrets.SFTP_PRIVATE_KEY }}" | base64 -d > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
+          
+          # DIAGNÓSTICO: Esto nos dirá si la llave es válida sin revelar su contenido
+          echo "🔍 Comprobando formato de la llave:"
+          ssh-keygen -l -f ~/.ssh/id_rsa || echo "❌ LA LLAVE TIENE UN FORMATO INVÁLIDO"
+
+          # Configuración agresiva para AWS
+          cat <<EOF > ~/.ssh/config
+          Host *
+            IdentityFile ~/.ssh/id_rsa
+            IdentitiesOnly yes
+            StrictHostKeyChecking no
+            PubkeyAcceptedAlgorithms +ssh-rsa
+          EOF
+
           ssh-keyscan -H "${{ secrets.SFTP_HOST }}" >> ~/.ssh/known_hosts
 
           if [ -d "images" ]; then
-            echo "✅ Subiendo imágenes al FTP..."
-            # rsync subirá las carpetas y archivos nuevos creados por el script
-            rsync -avz -e ssh images/ "${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_HOST }}:$RUTA_REMOTA/"
-          else
-            echo "⚠️ No hay imágenes para subir."
+            echo "🚀 Intentando subir imágenes..."
+            # Añadimos -vv para ver EXACTAMENTE por qué rechaza la llave
+            rsync -avz -e "ssh -vv" images/ "${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_HOST }}:$RUTA_REMOTA/"
           fi
