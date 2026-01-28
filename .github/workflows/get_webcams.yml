@@ -7,7 +7,7 @@ on:
 
 env:
   # Ajusta esta ruta a tu carpeta de destino en el FTP
-  RUTA_REMOTA: "/tu/ruta/remota/webcams"
+  RUTA_REMOTA: "/infografias/2026/01/dgt_webcams_realtime/data"
 
 jobs:
   descargar-webcams:
