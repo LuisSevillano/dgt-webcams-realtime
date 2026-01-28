@@ -46,7 +46,7 @@ jobs:
 
           echo "Subiendo imágenes al FTP..."
           if [ -d "images" ]; then
-            scp -r images/* "${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_HOST }}:$RUTA_REMOTA/"
+            scp -O -r images/* "${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_HOST }}:$RUTA_REMOTA/"
           else
             echo "⚠️ No se encontraron imágenes para subir."
           fi
