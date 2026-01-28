@@ -46,10 +46,10 @@ jobs:
 
           echo "Subiendo imágenes al FTP..."
           if [ -d "images" ]; then
-            sftp -oBatchMode=yes -b - "${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_HOST }}" <<EOF
-              cd $RUTA_REMOTA
-              put -r images/*
-              bye
+            # Usamos printf para enviar los comandos de forma limpia
+            # 'put -r' sube la estructura de carpetas
+            printf "cd $RUTA_REMOTA\nput -r images/*\nbye\n" | sftp -oBatchMode=yes -b - "${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_HOST }}"
+            echo "✅ Subida finalizada."
           else
             echo "⚠️ No se encontraron imágenes para subir."
           fi
