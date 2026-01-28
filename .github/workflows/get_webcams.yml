@@ -1,0 +1,36 @@
+name: DGT Webcams to FTP
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+env:
+  RUTA_REMOTA: "/infografias/2026/01/dgt_webcams_realtime/data"
+
+jobs:
+  descargar-y-subir:
+    name: Captura y Transferencia
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate Data (Download Webcams)
+        run: bash script.sh
+
+      - name: Upload to FTP
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SFTP_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.SFTP_HOST }}" >> ~/.ssh/known_hosts
+
+          if [ -d "images" ]; then
+            echo "✅ Subiendo imágenes al FTP..."
+            # rsync subirá las carpetas y archivos nuevos creados por el script
+            rsync -avz -e ssh images/ "${{ secrets.SFTP_USERNAME }}@${{ secrets.SFTP_HOST }}:$RUTA_REMOTA/"
+          else
+            echo "⚠️ No hay imágenes para subir."
+          fi
