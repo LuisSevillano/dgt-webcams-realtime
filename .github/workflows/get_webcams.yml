@@ -9,7 +9,7 @@ env:
   # Histórico con caché (S3 estándar)
   RUTA_REMOTA: "/infografias/2026/01/dgt_webcams_realtime/data"
   # Últimas imágenes sin caché (Configurada en el CDN/Servidor)
-  RUTA_REMOTA_NO_CACHE: "/infografias/2026/01/dgt_webcams_realtime/latest"
+  RUTA_REMOTA_NO_CACHE: "/infografias/data/2026/01/dgt_webcams_realtime/latest"
 
 jobs:
   descargar-y-subir:
